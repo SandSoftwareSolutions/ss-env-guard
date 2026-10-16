@@ -1,0 +1,44 @@
+{
+  "name": "@sandsoftwaresolutions/env-guard",
+  "version": "0.1.0",
+  "description": "Check environment variables at startup: typed, all problems at once, secrets never shown. Writes your .env.example too.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "keywords": [
+    "env",
+    "environment",
+    "dotenv",
+    "config",
+    "validation"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SandSoftwareSolutions/ss-env-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SandSoftwareSolutions/ss-env-guard/issues"
+  },
+  "homepage": "https://github.com/SandSoftwareSolutions/ss-env-guard#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}
