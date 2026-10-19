@@ -66,3 +66,72 @@ test("exampleEnv describes the schema and hides secret defaults", () => {
   assert.match(text, /MODE=dev/);
   assert.match(text, /enum: dev \| prod/);
 });
+
+test("names that exist on every object are not variables", () => {
+  assert.throws(() => defineEnv({ constructor: { type: "string" } }, { source: {} }), /constructor: is required but missing/);
+  assert.throws(() => defineEnv({ toString: {} }, { source: {} }), EnvError);
+  assert.deepEqual({ ...defineEnv({ valueOf: { optional: true } }, { source: {} }) }, { valueOf: undefined });
+  const env = defineEnv({ ["__proto__"]: { type: "list", default: ["x"] }, A: {} }, { source: { A: "1" } });
+  assert.equal(Object.getPrototypeOf(env), Object.prototype);
+  assert.deepEqual(Object.keys(env), ["__proto__", "A"]);
+});
+
+test("integers must be safe integers, numbers must be plain decimals", () => {
+  assert.throws(() => defineEnv({ I: { type: "integer" } }, { source: { I: "99999999999999999999" } }), /whole number that fits/);
+  assert.equal(defineEnv({ I: { type: "integer" } }, { source: { I: "9007199254740991" } }).I, 9007199254740991);
+  for (const bad of ["0x10", "0b11", "0o7", "Infinity", "1e999", "1 2", "--1", "."]) {
+    assert.throws(() => defineEnv({ N: { type: "number" } }, { source: { N: bad } }), /must be a number/, bad);
+  }
+  for (const [raw, value] of [["1e3", 1000], [" 5 ", 5], ["-.5", -0.5], ["+2.", 2], ["0", 0]]) {
+    assert.equal(defineEnv({ N: { type: "number" } }, { source: { N: raw } }).N, value, raw);
+  }
+});
+
+test("a pattern with the g flag gives the same answer every time", () => {
+  const schema = { CODE: { pattern: /^ab$/g } };
+  for (let i = 0; i < 4; i++) assert.equal(defineEnv(schema, { source: { CODE: "ab" } }).CODE, "ab");
+});
+
+test("a null entry in the schema is a clear error", () => {
+  assert.throws(() => defineEnv({ A: null }, { source: {} }), (e) => e instanceof TypeError && /A needs a description object/.test(e.message));
+});
+
+test("exampleEnv cannot be made to write extra variables or broken lines", () => {
+  const text = exampleEnv({
+    A: { description: "first line\nINJECTED=1", default: "x" },
+    B: { default: "two words # not a comment" },
+    C: { default: "it's\nbroken" },
+    D: { default: "plain/value:1" }
+  });
+  const lines = text.split("\n").filter((l) => l && !l.startsWith("#"));
+  assert.deepEqual(lines, ["A=x", "B='two words # not a comment'", "C=", "D=plain/value:1"]);
+});
+
+test("a secret value never appears in any error message, whatever the type", () => {
+  const cases = [
+    [{ type: "number", min: 10 }, "0.7654321"],
+    [{ type: "number", max: 1 }, "98765.4321"],
+    [{ type: "number" }, "hunter2-secret"],
+    [{ type: "integer" }, "hunter2-secret"],
+    [{ type: "integer", min: 99999999 }, "1234567"],
+    [{ type: "integer", max: 1 }, "1234567"],
+    [{ type: "integer" }, "123456789012345678901234567890"],
+    [{ type: "port" }, "123456"],
+    [{ type: "enum", values: ["a", "b"] }, "hunter2-secret"],
+    [{ type: "url" }, "hunter2-secret"],
+    [{ type: "url", protocols: ["https"] }, "ftp://user:hunter2@host/"],
+    [{ type: "string", minLength: 99 }, "hunter2-secret"],
+    [{ type: "string", pattern: /^x$/ }, "hunter2-secret"],
+    [{ type: "boolean" }, "hunter2-secret"]
+  ];
+  for (const [spec, value] of cases) {
+    let message = "";
+    try {
+      defineEnv({ S: { ...spec, secret: true } }, { source: { S: value } });
+    } catch (error) {
+      message = error.message;
+    }
+    assert.notEqual(message, "", `${JSON.stringify(spec)} should have failed`);
+    for (const piece of ["hunter2", "7654321", "98765", "1234567", "123456"]) assert.ok(!message.includes(piece), `${spec.type} leaked ${piece}: ${message}`);
+  }
+});
