@@ -10,6 +10,8 @@ Check your environment variables once, at startup. You get a typed object, every
 npm install @sandsoftwaresolutions/env-guard
 ```
 
+Works with `import` and `require()`, and ships TypeScript types for both.
+
 ## Usage
 
 ```js
